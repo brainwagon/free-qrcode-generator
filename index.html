@@ -156,14 +156,22 @@
             </div>
             
             <!-- Style Selector -->
-            <div>
-                <label for="style-select" class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Style</label>
-                <select id="style-select" class="block w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-gray-50">
-                    <option value="square">Square (Standard)</option>
-                    <option value="rounded">Rounded</option>
-                    <option value="dots">Dots</option>
-                    <option value="classy">Classy</option>
-                </select>
+            <div class="space-y-3">
+                <div>
+                    <label for="style-select" class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Style</label>
+                    <select id="style-select" class="block w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-gray-50">
+                        <option value="square">Square (Standard)</option>
+                        <option value="rounded">Rounded</option>
+                        <option value="dots">Dots</option>
+                        <option value="classy">Classy</option>
+                    </select>
+                </div>
+                
+                <!-- Transparent Background Checkbox -->
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="transparent-bg" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" checked>
+                    <label for="transparent-bg" class="text-xs text-gray-700 font-medium cursor-pointer select-none">Transparent Background <span class="text-gray-400 font-normal">(Slicer Safe Mode)</span></label>
+                </div>
             </div>
 
             <button id="generate-btn" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-bold shadow-md">
@@ -234,6 +242,7 @@
         // --- Elements ---
         const typeSelect = document.getElementById('type-select');
         const styleSelect = document.getElementById('style-select');
+        const transparentBgCheck = document.getElementById('transparent-bg');
         const generateBtn = document.getElementById('generate-btn');
         const qrContainer = document.getElementById('qr-container');
         const placeholder = document.getElementById('placeholder');
@@ -276,8 +285,6 @@
         // --- 2. QR Instances ---
         
         // Instance 1: Preview (Canvas)
-        // Changed to CANVAS type to fix the edge-clipping bug common in SVGs for short data
-        // Increased margin to 20 for safety
         const qrCodePreview = new QRCodeStyling({
             width: 400, 
             height: 400,
@@ -290,7 +297,7 @@
         });
 
         // Instance 2: Download (High Res SVG/PNG)
-        // Kept as SVG for download as it scales indefinitely
+        // Used only when transparent is NOT checked
         const qrCodeDownload = new QRCodeStyling({
             width: 2000, 
             height: 2000,
@@ -338,6 +345,8 @@
         // Helper to get style configuration based on dropdowns
         function getStyleConfig(text) {
             const style = styleSelect.value;
+            // Note: For preview we always use white background for better visibility
+            // The transparent logic is now handled in the dedicated generator
             let dotType = "square";
             let cornerType = "square";
             let cornerDotType = "square";
@@ -360,7 +369,8 @@
                 data: text,
                 dotsOptions: { color: "#000000", type: dotType },
                 cornersSquareOptions: { type: cornerType },
-                cornersDotOptions: { type: cornerDotType }
+                cornersDotOptions: { type: cornerDotType },
+                backgroundOptions: { color: "#ffffff" }
             };
         }
 
@@ -400,10 +410,78 @@
             qrCodeDownload.download({ name: "qrcode", extension: "png" });
         });
 
-        document.getElementById('download-svg-btn').addEventListener('click', () => {
+        // --- CUSTOM SLICER-SAFE SVG GENERATOR ---
+        function generateCleanSVG() {
+            if (!currentText) return;
+            
+            // 1. Calculate Raw Matrix (True/False)
+            const qr = qrcode(0, 'H'); 
+            qr.addData(currentText);
+            qr.make();
+            const count = qr.getModuleCount();
+            
+            // Set scale
+            const moduleSize = 10;
+            const margin = 20; // Margin around edge
+            const size = (count * moduleSize) + (2 * margin);
+            
+            // 2. Start SVG string
+            // viewbox defines the logical coordinates
+            let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="2000" height="2000">`;
+            
+            // 3. Iterate and Draw Geometry
+            const style = styleSelect.value;
+            
+            for (let r = 0; r < count; r++) {
+                for (let c = 0; c < count; c++) {
+                    if (qr.isDark(r, c)) {
+                        const x = margin + (c * moduleSize);
+                        const y = margin + (r * moduleSize);
+                        
+                        if (style === 'dots') {
+                             // Draw Circle
+                             // Reduce radius slightly (0.85) to ensure dots don't touch and look "blobby" in slicer
+                             const radius = (moduleSize / 2) * 0.9; 
+                             const cx = x + moduleSize/2;
+                             const cy = y + moduleSize/2;
+                             svgContent += `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="#000000"/>`;
+                        } else if (style === 'rounded' || style === 'classy') {
+                             // Draw Rounded Rect
+                             const rVal = moduleSize * 0.35; // Moderate rounding
+                             svgContent += `<rect x="${x}" y="${y}" width="${moduleSize}" height="${moduleSize}" rx="${rVal}" fill="#000000"/>`;
+                        } else {
+                             // Draw Standard Square
+                             svgContent += `<rect x="${x}" y="${y}" width="${moduleSize}" height="${moduleSize}" fill="#000000"/>`;
+                        }
+                    }
+                }
+            }
+            
+            svgContent += '</svg>';
+            return svgContent;
+        }
+
+        document.getElementById('download-svg-btn').addEventListener('click', async () => {
             if(!currentText) return;
-            updateDownloader();
-            qrCodeDownload.download({ name: "qrcode", extension: "svg" });
+            
+            // If "Transparent" is checked, we use the Clean Generator
+            if (document.getElementById('transparent-bg').checked) {
+                 const svgContent = generateCleanSVG();
+                 const blob = new Blob([svgContent], {type: "image/svg+xml;charset=utf-8"});
+                 const url = URL.createObjectURL(blob);
+                 
+                 const link = document.createElement('a');
+                 link.href = url;
+                 link.download = 'qrcode_slicer_safe.svg';
+                 document.body.appendChild(link);
+                 link.click();
+                 document.body.removeChild(link);
+                 URL.revokeObjectURL(url);
+            } else {
+                 // Use Standard Generator (for Web/Print)
+                 updateDownloader();
+                 qrCodeDownload.download({ name: "qrcode", extension: "svg" });
+            }
         });
 
         // --- 4. DXF Generator ---
@@ -447,6 +525,11 @@
 
         document.getElementById('download-dxf-btn').addEventListener('click', generateDXF);
         generateBtn.addEventListener('click', generateQR);
+        
+        // Also update if style/background changes
+        transparentBgCheck.addEventListener('change', () => {
+             if (currentText) generateQR();
+        });
 
     </script>
 </body>

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free QR Code Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- qr-code-styling Library (For UI/Preview/PNG/SVG) -->
+    <script type="text/javascript" src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    <!-- qrcode-generator (For calculating raw matrix for DXF) -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Container for the generated QR code */
+        #qr-container svg, #qr-container canvas {
+            max-width: 100%;
+            height: auto !important;
+            /* Removed border-radius to prevent corner clipping */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            display: none;
+        }
+        .form-group.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col md:flex-row">
+        
+        <!-- Left Side: Controls -->
+        <div class="w-full md:w-1/2 p-6 space-y-5 border-b md:border-b-0 md:border-r border-gray-100 bg-white z-10">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">QR Generator</h1>
+                    <p class="text-gray-400 text-xs">Generate & Download (PNG, SVG, DXF)</p>
+                </div>
+                <button id="about-btn" class="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline transition-colors cursor-pointer">
+                    About...
+                </button>
+            </div>
+
+            <!-- Content Type Selector -->
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Content Type</label>
+                <select id="type-select" class="block w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-gray-50">
+                    <option value="text">Text / URL</option>
+                    <option value="wifi">Wi-Fi Network</option>
+                    <option value="vcard">Contact (vCard)</option>
+                    <option value="email">Email</option>
+                    <option value="phone">Phone Number</option>
+                    <option value="sms">SMS Message</option>
+                </select>
+            </div>
+
+            <!-- DYNAMIC FORMS -->
+            <div id="forms-container" class="space-y-3 min-h-[200px]">
+                
+                <!-- 1. Text / URL Form -->
+                <div id="form-text" class="form-group active">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Content</label>
+                    <textarea id="input-text-val" rows="4" placeholder="https://example.com or plain text" class="w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none"></textarea>
+                </div>
+
+                <!-- 2. Wi-Fi Form -->
+                <div id="form-wifi" class="form-group space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Network Name (SSID)</label>
+                        <input type="text" id="wifi-ssid" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                        <input type="text" id="wifi-pass" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Encryption</label>
+                        <select id="wifi-type" class="w-full rounded-lg border border-gray-300 p-2 text-sm bg-white">
+                            <option value="WPA">WPA/WPA2</option>
+                            <option value="WEP">WEP</option>
+                            <option value="nopass">No Password</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="wifi-hidden" class="rounded text-indigo-600 focus:ring-indigo-500">
+                        <label for="wifi-hidden" class="text-xs text-gray-600">Hidden Network</label>
+                    </div>
+                </div>
+
+                <!-- 3. vCard Form -->
+                <div id="form-vcard" class="form-group space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">First Name</label>
+                            <input type="text" id="vcard-first" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Last Name</label>
+                            <input type="text" id="vcard-last" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Mobile Phone</label>
+                        <input type="tel" id="vcard-phone" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="vcard-email" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Company / Org</label>
+                        <input type="text" id="vcard-org" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                </div>
+
+                <!-- 4. Email Form -->
+                <div id="form-email" class="form-group space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
+                        <input type="email" id="email-addr" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Subject</label>
+                        <input type="text" id="email-sub" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Body</label>
+                        <textarea id="email-body" rows="3" class="w-full rounded-lg border border-gray-300 p-2 text-sm"></textarea>
+                    </div>
+                </div>
+
+                <!-- 5. Phone Form -->
+                <div id="form-phone" class="form-group space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" id="phone-tel" placeholder="+1 234 567 8900" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                </div>
+
+                <!-- 6. SMS Form -->
+                <div id="form-sms" class="form-group space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" id="sms-tel" class="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Message</label>
+                        <textarea id="sms-msg" rows="3" class="w-full rounded-lg border border-gray-300 p-2 text-sm"></textarea>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Style Selector -->
+            <div>
+                <label for="style-select" class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Style</label>
+                <select id="style-select" class="block w-full rounded-lg border-gray-300 border p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-gray-50">
+                    <option value="square">Square (Standard)</option>
+                    <option value="rounded">Rounded</option>
+                    <option value="dots">Dots</option>
+                    <option value="classy">Classy</option>
+                </select>
+            </div>
+
+            <button id="generate-btn" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-bold shadow-md">
+                Generate QR Code
+            </button>
+        </div>
+
+        <!-- Right Side: Preview & Download -->
+        <div class="w-full md:w-1/2 bg-gray-50 p-6 flex flex-col items-center justify-center border-t md:border-t-0 min-h-[400px]">
+            
+             <!-- QR Display Area -->
+             <div class="bg-white border-2 border-dashed border-gray-200 rounded-xl p-6 w-full max-w-[400px] flex flex-col items-center justify-center relative shadow-sm mb-6 aspect-square">
+                
+                <!-- Placeholder State -->
+                <div id="placeholder" class="text-center text-gray-400 absolute inset-0 flex flex-col items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                    <p class="text-sm">Enter details and click Generate</p>
+                </div>
+
+                <!-- Actual QR Code Container -->
+                <div id="qr-container" class="hidden w-full h-full flex items-center justify-center"></div>
+            </div>
+
+            <!-- Actions -->
+            <div id="actions" class="hidden grid grid-cols-3 gap-3 w-full max-w-[300px]">
+                <button id="download-png-btn" class="flex flex-col items-center justify-center p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm text-gray-600 text-xs font-semibold">
+                    <span class="mb-1 text-lg font-bold">PNG</span>
+                    Image
+                </button>
+
+                <button id="download-svg-btn" class="flex flex-col items-center justify-center p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm text-gray-600 text-xs font-semibold">
+                    <span class="mb-1 text-lg font-bold">SVG</span>
+                    Vector
+                </button>
+
+                 <button id="download-dxf-btn" class="flex flex-col items-center justify-center p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm text-gray-600 text-xs font-semibold">
+                    <span class="mb-1 text-lg font-bold">DXF</span>
+                    CAD
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl transform transition-all scale-100">
+            <div class="flex items-center gap-3 mb-3 text-indigo-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 class="text-lg font-bold text-gray-900">About this Tool</h3>
+            </div>
+            <p class="text-gray-600 text-sm mb-6 leading-relaxed">
+                This QR Code Generator was created using <strong class="text-gray-800">Google's Gemini AI</strong>.
+                <br><br>
+                It runs entirely in your browser and gathers no information from the user, allowing you to freely generate QR codes.
+            </p>
+            <button id="close-about-btn" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg hover:bg-indigo-700 transition font-medium text-sm shadow-sm">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Elements ---
+        const typeSelect = document.getElementById('type-select');
+        const styleSelect = document.getElementById('style-select');
+        const generateBtn = document.getElementById('generate-btn');
+        const qrContainer = document.getElementById('qr-container');
+        const placeholder = document.getElementById('placeholder');
+        const actions = document.getElementById('actions');
+        
+        // --- About Modal Logic ---
+        const aboutBtn = document.getElementById('about-btn');
+        const closeAboutBtn = document.getElementById('close-about-btn');
+        const aboutModal = document.getElementById('about-modal');
+
+        function toggleModal(show) {
+            if (show) {
+                aboutModal.classList.remove('hidden');
+            } else {
+                aboutModal.classList.add('hidden');
+            }
+        }
+
+        aboutBtn.addEventListener('click', () => toggleModal(true));
+        closeAboutBtn.addEventListener('click', () => toggleModal(false));
+        
+        // Close when clicking background
+        aboutModal.addEventListener('click', (e) => {
+            if (e.target === aboutModal) toggleModal(false);
+        });
+
+        // --- State ---
+        let currentText = "";
+        let currentType = "text";
+
+        // --- 1. UI Logic (Form Switching) ---
+        typeSelect.addEventListener('change', (e) => {
+            currentType = e.target.value;
+            // Hide all forms
+            document.querySelectorAll('.form-group').forEach(el => el.classList.remove('active'));
+            // Show selected form
+            document.getElementById(`form-${currentType}`).classList.add('active');
+        });
+
+        // --- 2. QR Instances ---
+        
+        // Instance 1: Preview (Canvas)
+        // Changed to CANVAS type to fix the edge-clipping bug common in SVGs for short data
+        // Increased margin to 20 for safety
+        const qrCodePreview = new QRCodeStyling({
+            width: 400, 
+            height: 400,
+            type: "canvas", 
+            data: "",
+            margin: 20,
+            dotsOptions: { color: "#000000", type: "square" },
+            backgroundOptions: { color: "#ffffff" },
+            qrOptions: { errorCorrectionLevel: 'H' }
+        });
+
+        // Instance 2: Download (High Res SVG/PNG)
+        // Kept as SVG for download as it scales indefinitely
+        const qrCodeDownload = new QRCodeStyling({
+            width: 2000, 
+            height: 2000,
+            type: "svg",
+            data: "",
+            margin: 60,
+            dotsOptions: { color: "#000000", type: "square" },
+            backgroundOptions: { color: "#ffffff" },
+            qrOptions: { errorCorrectionLevel: 'H' }
+        });
+
+        function getFormattedData() {
+            switch(currentType) {
+                case 'text':
+                    return document.getElementById('input-text-val').value;
+                case 'wifi':
+                    const ssid = document.getElementById('wifi-ssid').value;
+                    const pass = document.getElementById('wifi-pass').value;
+                    const type = document.getElementById('wifi-type').value;
+                    const hidden = document.getElementById('wifi-hidden').checked;
+                    return `WIFI:S:${ssid};T:${type};P:${pass};H:${hidden};;`;
+                case 'vcard':
+                    const nFirst = document.getElementById('vcard-first').value;
+                    const nLast = document.getElementById('vcard-last').value;
+                    const tel = document.getElementById('vcard-phone').value;
+                    const email = document.getElementById('vcard-email').value;
+                    const org = document.getElementById('vcard-org').value;
+                    return `BEGIN:VCARD\nVERSION:3.0\nN:${nLast};${nFirst}\nFN:${nFirst} ${nLast}\nORG:${org}\nTEL:${tel}\nEMAIL:${email}\nEND:VCARD`;
+                case 'email':
+                    const eAddr = document.getElementById('email-addr').value;
+                    const eSub = document.getElementById('email-sub').value;
+                    const eBody = document.getElementById('email-body').value;
+                    return `mailto:${eAddr}?subject=${encodeURIComponent(eSub)}&body=${encodeURIComponent(eBody)}`;
+                case 'phone':
+                    return `tel:${document.getElementById('phone-tel').value}`;
+                case 'sms':
+                    const sTel = document.getElementById('sms-tel').value;
+                    const sMsg = document.getElementById('sms-msg').value;
+                    return `smsto:${sTel}:${sMsg}`;
+                default:
+                    return "";
+            }
+        }
+
+        // Helper to get style configuration based on dropdowns
+        function getStyleConfig(text) {
+            const style = styleSelect.value;
+            let dotType = "square";
+            let cornerType = "square";
+            let cornerDotType = "square";
+
+            if (style === "rounded") {
+                dotType = "rounded";
+                cornerType = "extra-rounded";
+                cornerDotType = "dot";
+            } else if (style === "dots") {
+                dotType = "dots";
+                cornerType = "dot";
+                cornerDotType = "dot";
+            } else if (style === "classy") {
+                dotType = "classy";
+                cornerType = "extra-rounded";
+                cornerDotType = "square";
+            }
+
+            return {
+                data: text,
+                dotsOptions: { color: "#000000", type: dotType },
+                cornersSquareOptions: { type: cornerType },
+                cornersDotOptions: { type: cornerDotType }
+            };
+        }
+
+        function generateQR() {
+            const text = getFormattedData();
+            
+            if (!text || text.length < 2) {
+                alert("Please fill in the required fields");
+                return;
+            }
+            
+            currentText = text;
+            
+            // Update the Preview Instance
+            qrCodePreview.update(getStyleConfig(text));
+
+            // UI Updates
+            placeholder.classList.add('hidden');
+            qrContainer.classList.remove('hidden');
+            actions.classList.remove('hidden');
+
+            // Append preview if not already there
+            if (qrContainer.innerHTML === "") {
+                qrCodePreview.append(qrContainer);
+            }
+        }
+
+        // --- 3. Downloads ---
+        
+        function updateDownloader() {
+             qrCodeDownload.update(getStyleConfig(currentText));
+        }
+
+        document.getElementById('download-png-btn').addEventListener('click', () => {
+            if(!currentText) return;
+            updateDownloader();
+            qrCodeDownload.download({ name: "qrcode", extension: "png" });
+        });
+
+        document.getElementById('download-svg-btn').addEventListener('click', () => {
+            if(!currentText) return;
+            updateDownloader();
+            qrCodeDownload.download({ name: "qrcode", extension: "svg" });
+        });
+
+        // --- 4. DXF Generator ---
+        function generateDXF() {
+            if (!currentText) return;
+            const qr = qrcode(0, 'H'); 
+            qr.addData(currentText);
+            qr.make();
+            const count = qr.getModuleCount();
+            let dxfContent = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
+            
+            const useCircles = styleSelect.value === 'dots';
+            const moduleSize = 10;
+            
+            for (let r = 0; r < count; r++) {
+                for (let c = 0; c < count; c++) {
+                    if (qr.isDark(r, c)) {
+                        const x = c * moduleSize;
+                        const y = (count - 1 - r) * moduleSize;
+                        if (useCircles) {
+                            const radius = (moduleSize / 2) * 0.85; 
+                            dxfContent += `0\nCIRCLE\n8\nQR_LAYER\n10\n${x + moduleSize/2}\n20\n${y + moduleSize/2}\n40\n${radius}\n`;
+                        } else {
+                            const s = moduleSize; 
+                            dxfContent += `0\nLWPOLYLINE\n8\nQR_LAYER\n90\n4\n70\n1\n10\n${x}\n20\n${y}\n10\n${x+s}\n20\n${y}\n10\n${x+s}\n20\n${y+s}\n10\n${x}\n20\n${y+s}\n`;
+                        }
+                    }
+                }
+            }
+            dxfContent += "0\nENDSEC\n0\nEOF\n";
+            const blob = new Blob([dxfContent], {type: "application/dxf"});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = "qrcode.dxf";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('download-dxf-btn').addEventListener('click', generateDXF);
+        generateBtn.addEventListener('click', generateQR);
+
+    </script>
+</body>
+</html>

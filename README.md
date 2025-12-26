@@ -31,6 +31,26 @@ Simply open `index.html` in any modern web browser.
 4. Click **Generate QR Code**.
 5. Download your QR code in the desired format (PNG, SVG, or DXF).
 
+## Self-Hosting / Run Locally
+
+Since this is a client-side only application, you can easily host it yourself or run it locally.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/brainwagon/free-qrcode-generator.git
+   cd free-qrcode-generator
+   ```
+
+2. **Start a local server:**
+   If you have Python installed, you can use the built-in HTTP server:
+   ```bash
+   python3 -m http.server
+   ```
+
+3. **Access the application:**
+   Open your browser and navigate to:
+   `http://localhost:8000`
+
 ## Credits
 
 This project was developed entirely using **Google's Gemini CLI**.

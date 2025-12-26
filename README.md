@@ -2,6 +2,8 @@
 
 A lightweight, self-contained, single-file QR code generator that runs entirely in your browser.
 
+![Example Image](example.png)
+
 ## Features
 
 - **Single File**: Everything is contained within `index.html`. No complex setup or server-side requirements.
